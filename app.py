@@ -3,7 +3,7 @@ import pandas as pd
 import os
 from PIL import Image, ExifTags
 import folium
-from folium.plugins import MarkerCluster, Fullscreen  # 🌟 Fullscreen 플러그인 추가
+from folium.plugins import MarkerCluster, Fullscreen
 from streamlit_folium import st_folium
 from ultralytics import YOLO
 import io
@@ -13,6 +13,7 @@ st.set_page_config(page_title="쓰레기 위치 맵핑 및 카운터", layout="w
 
 @st.cache_resource
 def load_model():
+    # 사용 환경에 맞춰 객체 검출 모델 로드 (예: yolov8n.pt 등)
     return YOLO('yolov8n.pt')
 
 model = load_model()
@@ -69,12 +70,13 @@ def save_data(new_data_df):
         updated_data = pd.concat([existing_data, new_data_df], ignore_index=True)
     else:
         updated_data = new_data_df
+    # 파일명이 중복될 경우 최신 정보(수정본 포함)를 유지하기 위해 drop_duplicates 처리
     updated_data = updated_data.drop_duplicates(subset=["filename"], keep="last")
     updated_data.to_csv(DATA_FILE, index=False)
 
 # --- 3. Streamlit UI 구성 ---
 st.title("🌍 스마트 쓰레기 맵핑 프로그램")
-st.write("GPS 정보가 포함된 사진을 업로드하고 버튼을 누르면 AI가 분석을 시작합니다.")
+st.write("GPS 정보가 포함된 사진을 업로드하고 버튼을 누르면 AI가 분석을 시작합니다. 잘못 예측된 개수는 오른쪽 표에서 직접 수정할 수 있습니다.")
 
 with st.sidebar:
     st.header("사진 업로드")
@@ -128,7 +130,6 @@ with col1:
         center_lon = df["longitude"].mean()
         m = folium.Map(location=[center_lat, center_lon], zoom_start=14)
 
-        # 🌟 전체화면 버튼 지도에 추가
         Fullscreen(
             position='topright',
             title='전체화면 켜기',
@@ -156,7 +157,7 @@ with col1:
                 border: 2px solid white;
                 box-shadow: 2px 2px 4px rgba(0,0,0,0.5);
             ">
-                {row['trash_count']}
+                {int(row['trash_count'])}
             </div>
             """
 
@@ -166,7 +167,6 @@ with col1:
                 icon=folium.DivIcon(html=html_icon, icon_size=(30, 30), icon_anchor=(15, 15))
             ).add_to(marker_cluster)
 
-        # 지도를 렌더링할 때 반응형으로 꽉 차게 설정 (가로폭 조정)
         st_folium(m, use_container_width=True, height=500, key="trash_map_display")
     else:
         st.info("현재 저장된 데이터가 없습니다. 사진을 업로드하고 분석 버튼을 눌러주세요.")
@@ -174,6 +174,22 @@ with col1:
 with col2:
     st.subheader("📋 누적 데이터 목록")
     if not df.empty:
-        st.dataframe(df)
+        st.caption("💡 표 안의 숫자를 더블클릭하여 수동으로 수정한 뒤, 아래 '수정사항 저장' 버튼을 누르세요.")
+        
+        # 🌟 수동 수정을 가능하게 만드는 핵심: st.data_editor 활용
+        # 파일명은 고정하고 trash_count, 위도, 경도만 수정할 수 있도록 세팅 (원하시면 열 제어 가능)
+        edited_df = st.data_editor(
+            df, 
+            use_container_width=True,
+            disabled=["filename"], # 파일명은 수정 불가능하도록 차단
+            key="data_editor"
+        )
+        
+        # 🌟 변경사항이 있을 때만 저장 버튼 활성화
+        if not edited_df.equals(df):
+            if st.button("💾 수정사항 저장", type="primary"):
+                edited_df.to_csv(DATA_FILE, index=False)
+                st.success("데이터가 성공적으로 업데이트되었습니다!")
+                st.rerun()
     else:
         st.write("데이터 없음")
