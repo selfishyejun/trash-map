@@ -13,7 +13,6 @@ st.set_page_config(page_title="쓰레기 위치 맵핑 및 카운터", layout="w
 
 @st.cache_resource
 def load_model():
-    # 사용 환경에 맞춰 객체 검출 모델 로드 (예: yolov8n.pt 등)
     return YOLO('yolov8n.pt')
 
 model = load_model()
@@ -70,7 +69,6 @@ def save_data(new_data_df):
         updated_data = pd.concat([existing_data, new_data_df], ignore_index=True)
     else:
         updated_data = new_data_df
-    # 파일명이 중복될 경우 최신 정보(수정본 포함)를 유지하기 위해 drop_duplicates 처리
     updated_data = updated_data.drop_duplicates(subset=["filename"], keep="last")
     updated_data.to_csv(DATA_FILE, index=False)
 
@@ -137,10 +135,32 @@ with col1:
             force_separate_button=True
         ).add_to(m)
 
-        marker_cluster = MarkerCluster(name="Trash Cluster").add_to(m)
+        # 🌟 변경 포인트 1: 클러스터링 되었을 때 '단순 마커 개수'가 아니라 '쓰레기 개수의 합(sum)'을 계산하는 자바스크립트 함수
+        icon_create_function = """
+        function(cluster) {
+            var markers = cluster.getAllChildMarkers();
+            var sum = 0;
+            for (var i = 0; i < markers.length; i++) {
+                // 마커 생성시 저장해둔 custom_trash_count 값을 다 더함
+                sum += parseInt(markers[i].options.custom_trash_count) || 0;
+            }
+            return L.divIcon({
+                html: '<div style="background-color: #CB4335; color: white; border-radius: 50%; width: 36px; height: 36px; display: flex; justify-content: center; align-items: center; font-weight: bold; font-size: 13px; border: 2px solid white; box-shadow: 2px 2px 4px rgba(0,0,0,0.5);">' + sum + '</div>',
+                className: 'marker-cluster-custom',
+                iconSize: L.point(36, 36)
+            });
+        }
+        """
+
+        # 🌟 변경 포인트 2: options={'maxClusterRadius': 35} 를 주어 너무 넓은 범위가 한 번에 묶이지 않도록 제한 (기본값은 80으로 매우 넓음)
+        marker_cluster = MarkerCluster(
+            name="Trash Cluster",
+            icon_create_function=icon_create_function,
+            options={'maxClusterRadius': 35} 
+        ).add_to(m)
 
         for idx, row in df.iterrows():
-            popup_text = f"파일명: {row['filename']}<br>쓰레기 개수: {row['trash_count']}개"
+            popup_text = f"파일명: {row['filename']}<br>쓰레기 개수: {int(row['trash_count'])}개"
             
             html_icon = f"""
             <div style="
@@ -161,10 +181,12 @@ with col1:
             </div>
             """
 
+            # 🌟 변경 포인트 3:options 데이터에 'custom_trash_count'를 심어주어 위의 자바스크립트 함수가 읽을 수 있도록 연동
             folium.Marker(
                 [row['latitude'], row['longitude']],
                 popup=folium.Popup(popup_text, max_width=300),
-                icon=folium.DivIcon(html=html_icon, icon_size=(30, 30), icon_anchor=(15, 15))
+                icon=folium.DivIcon(html=html_icon, icon_size=(30, 30), icon_anchor=(15, 15)),
+                options={'custom_trash_count': int(row['trash_count'])} 
             ).add_to(marker_cluster)
 
         st_folium(m, use_container_width=True, height=500, key="trash_map_display")
@@ -176,16 +198,13 @@ with col2:
     if not df.empty:
         st.caption("💡 표 안의 숫자를 더블클릭하여 수동으로 수정한 뒤, 아래 '수정사항 저장' 버튼을 누르세요.")
         
-        # 🌟 수동 수정을 가능하게 만드는 핵심: st.data_editor 활용
-        # 파일명은 고정하고 trash_count, 위도, 경도만 수정할 수 있도록 세팅 (원하시면 열 제어 가능)
         edited_df = st.data_editor(
             df, 
             use_container_width=True,
-            disabled=["filename"], # 파일명은 수정 불가능하도록 차단
+            disabled=["filename"], 
             key="data_editor"
         )
         
-        # 🌟 변경사항이 있을 때만 저장 버튼 활성화
         if not edited_df.equals(df):
             if st.button("💾 수정사항 저장", type="primary"):
                 edited_df.to_csv(DATA_FILE, index=False)
