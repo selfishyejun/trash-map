@@ -70,13 +70,13 @@ def save_data(new_data_df):
 
 # --- 3. Streamlit UI 구성 ---
 st.title("🌍 스마트 쓰레기 맵핑 프로그램")
-st.write("GPS 정보가 포함된 사진을 업로드하고 버튼을 누르면 AI가 분석을 시작합니다. 잘못 예측된 개수는 오른쪽 표에서 직접 수정할 수 있습니다.")
+st.write("상단의 접이식 메뉴에서 사진을 업로드하세요. 지도로 분포를 확인하고, 하단 표에서 쓰레기 개수를 한눈에 편집할 수 있습니다.")
 
-with st.sidebar:
-    st.header("사진 업로드")
+# 🌟 개선 1: 사이드바 대신 접고 펼칠 수 있는 수납형(Expander) 영역으로 변경
+with st.expander("📸 사진 업로드 및 데이터 초기화 (클릭하여 열고 닫기)", expanded=True):
     uploaded_files = st.file_uploader("사진 선택", type=["jpg", "jpeg", "png"], accept_multiple_files=True)
-    st.markdown("---")
-    if st.button("전체 데이터 초기화"):
+    
+    if st.button("전체 데이터 초기화", type="secondary"):
         if os.path.exists(DATA_FILE):
             os.remove(DATA_FILE)
             st.success("데이터가 초기화되었습니다.")
@@ -108,135 +108,135 @@ if uploaded_files:
                 st.success("사진 정보가 성공적으로 지도에 등록되었습니다!")
                 st.rerun()
 
-# --- 5. 지도 및 데이터 시각화 ---
+# --- 5. 지도 및 데이터 시각화 (🌟 개선 2: 세로형 풀와이드 레이아웃으로 변경)
 df = load_data()
-col1, col2 = st.columns([2, 1])
 
-with col1:
-    st.subheader("쓰레기 분포 지도")
-    if not df.empty:
-        m = folium.Map(location=[df["latitude"].mean(), df["longitude"].mean()], zoom_start=13)
-        Fullscreen().add_to(m)
+# [1] 쓰레기 분포 지도 영역 (화면 전체 너비 활용)
+st.subheader("🗺️ 쓰레기 분포 지도")
+if not df.empty:
+    m = folium.Map(location=[df["latitude"].mean(), df["longitude"].mean()], zoom_start=14)
+    Fullscreen().add_to(m)
 
-        # 🌟 변경: 클러스터 크기를 52px -> 38px로 축소하여 조화롭게 수정
-        icon_create_function = """
-        function(cluster){
-            var markers = cluster.getAllChildMarkers();
-            var sum = 0;
+    # 구글맵 스타일 커스텀 클러스터 (38px 콤팩트 크기)
+    icon_create_function = """
+    function(cluster){
+        var markers = cluster.getAllChildMarkers();
+        var sum = 0;
 
-            for(var i=0; i<markers.length; i++){
-                sum += parseInt(markers[i].options.title) || 0;
-            }
-
-            var color;
-            if(sum <= 5)
-                color = "#2ECC71";
-            else if(sum <= 15)
-                color = "#F1C40F";
-            else if(sum <= 30)
-                color = "#E67E22";
-            else
-                color = "#E74C3C";
-
-            return L.divIcon({
-                html:
-                `<div style="
-                    width:38px;
-                    height:38px;
-                    border-radius:50%;
-                    background:${color};
-                    border:3.5px solid white;
-                    box-shadow:
-                        0 4px 12px rgba(0,0,0,.3),
-                        inset 0 1px 4px rgba(255,255,255,.3);
-                    display:flex;
-                    justify-content:center;
-                    align-items:center;
-                    color:white;
-                    font-weight:bold;
-                    font-size:14px;
-                ">
-                    ${sum}
-                </div>`,
-                className:"",
-                iconSize:[38, 38]
-            });
+        for(var i=0; i<markers.length; i++){
+            sum += parseInt(markers[i].options.title) || 0;
         }
-        """
 
-        marker_cluster = MarkerCluster(
-            name="Trash Cluster",
-            icon_create_function=icon_create_function,
-            options={'maxClusterRadius': 40}
-        ).add_to(m)
+        var color;
+        if(sum <= 5)
+            color = "#2ECC71";
+        else if(sum <= 15)
+            color = "#F1C40F";
+        else if(sum <= 30)
+            color = "#E67E22";
+        else
+            color = "#E74C3C";
 
-        for _, row in df.iterrows():
-            trash_count = int(row['trash_count'])
-
-            if trash_count <= 2:
-                color = "#2ECC71"
-            elif trash_count <= 5:
-                color = "#F1C40F"
-            elif trash_count <= 10:
-                color = "#E67E22"
-            else:
-                color = "#E74C3C"
-
-            # 🌟 변경: 개별 마커 크기를 38px -> 26px로 대폭 축소 (구글맵 스타일)
-            html_icon = f"""
-            <div style="
-                width:26px;
-                height:26px;
+        return L.divIcon({
+            html:
+            `<div style="
+                width:38px;
+                height:38px;
                 border-radius:50%;
-                background:{color};
-                border:2.5px solid white;
+                background:${color};
+                border:3.5px solid white;
                 box-shadow:
-                    0 3px 8px rgba(0,0,0,.3),
-                    inset 0 1px 3px rgba(255,255,255,.35);
+                    0 4px 12px rgba(0,0,0,.3),
+                    inset 0 1px 4px rgba(255,255,255,.3);
                 display:flex;
                 justify-content:center;
                 align-items:center;
                 color:white;
-                font-weight:700;
-                font-size:11px;
-                transition:0.2s;
+                font-weight:bold;
+                font-size:14px;
             ">
-                {trash_count}
-            </div>
-            """
+                ${sum}
+            </div>`,
+            className:"",
+            iconSize:[38, 38]
+        });
+    }
+    """
 
-            # 🌟 변경: 축소된 아이콘 크기(26x26) 및 앵커 포인트(13, 13) 반영
-            folium.Marker(
-                location=[row["latitude"], row["longitude"]],
-                popup=folium.Popup(
-                    f"""
-                    <b>{row['filename']}</b><br>
-                    🗑️ 쓰레기 <b>{trash_count}개</b>
-                    """,
-                    max_width=250
-                ),
-                icon=folium.DivIcon(
-                    html=html_icon,
-                    icon_size=(26, 26),
-                    icon_anchor=(13, 13)
-                ),
-                title=str(trash_count)
-            ).add_to(marker_cluster)
+    marker_cluster = MarkerCluster(
+        name="Trash Cluster",
+        icon_create_function=icon_create_function,
+        options={'maxClusterRadius': 40}
+    ).add_to(m)
 
-        st_folium(m, use_container_width=True, height=550, key="trash_map")
-    else:
-        st.info("표시할 데이터가 없습니다. 사진을 업로드해 주세요.")
+    for _, row in df.iterrows():
+        trash_count = int(row['trash_count'])
 
-with col2:
-    st.subheader("📋 데이터 목록")
-    if not df.empty:
-        edited_df = st.data_editor(
-            df, use_container_width=True,
-            column_config={"trash_count": st.column_config.NumberColumn("쓰레기 개수", min_value=0, step=1)},
-            disabled=["filename", "latitude", "longitude"], key="data_editor"
-        )
-        if not edited_df.equals(df):
-            if st.button("💾 수정사항 저장", type="primary"):
-                edited_df.to_csv(DATA_FILE, index=False)
-                st.success("데이터가 업데이트되었습니다.")
-                st.rerun()
+        if trash_count <= 2:
+            color = "#2ECC71"
+        elif trash_count <= 5:
+            color = "#F1C40F"
+        elif trash_count <= 10:
+            color = "#E67E22"
+        else:
+            color = "#E74C3C"
+
+        # 구글맵 스타일 개별 마커 (26px 미니 크기)
+        html_icon = f"""
+        <div style="
+            width:26px;
+            height:26px;
+            border-radius:50%;
+            background:{color};
+            border:2.5px solid white;
+            box-shadow:
+                0 3px 8px rgba(0,0,0,.3),
+                inset 0 1px 3px rgba(255,255,255,.35);
+            display:flex;
+            justify-content:center;
+            align-items:center;
+            color:white;
+            font-weight:700;
+            font-size:11px;
+            transition:0.2s;
+        ">
+            {trash_count}
+        </div>
+        """
+
+        folium.Marker(
+            location=[row["latitude"], row["longitude"]],
+            popup=folium.Popup(
+                f"""
+                <b>{row['filename']}</b><br>
+                🗑️ 쓰레기 <b>{trash_count}개</b>
+                """,
+                max_width=250
+            ),
+            icon=folium.DivIcon(
+                html=html_icon,
+                icon_size=(26, 26),
+                icon_anchor=(13, 13)
+            ),
+            title=str(trash_count)
+        ).add_to(marker_cluster)
+
+    st_folium(m, use_container_width=True, height=500, key="trash_map")
+else:
+    st.info("표시할 데이터가 없습니다. 상단 메뉴를 열어 사진을 업로드해 주세요.")
+
+st.markdown("---")
+
+# [2] 데이터 목록 편집 영역 (지도 아래 배치하여 잘림 현상 제거 및 시인성 극대화)
+st.subheader("📋 데이터 목록 및 수정")
+if not df.empty:
+    edited_df = st.data_editor(
+        df, use_container_width=True,
+        column_config={"trash_count": st.column_config.NumberColumn("쓰레기 개수", min_value=0, step=1)},
+        disabled=["filename", "latitude", "longitude"], key="data_editor"
+    )
+    if not edited_df.equals(df):
+        if st.button("💾 수정사항 저장", type="primary"):
+            edited_df.to_csv(DATA_FILE, index=False)
+            st.success("데이터가 업데이트되었습니다.")
+            st.rerun()
