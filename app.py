@@ -118,7 +118,7 @@ with col1:
         m = folium.Map(location=[df["latitude"].mean(), df["longitude"].mean()], zoom_start=13)
         Fullscreen().add_to(m)
 
-        # 🌟 개선: 구글맵 스타일의 커스텀 클러스터 생성 함수
+        # 🌟 변경: 클러스터 크기를 52px -> 38px로 축소하여 조화롭게 수정
         icon_create_function = """
         function(cluster){
             var markers = cluster.getAllChildMarkers();
@@ -141,25 +141,25 @@ with col1:
             return L.divIcon({
                 html:
                 `<div style="
-                    width:52px;
-                    height:52px;
+                    width:38px;
+                    height:38px;
                     border-radius:50%;
                     background:${color};
-                    border:5px solid white;
+                    border:3.5px solid white;
                     box-shadow:
-                        0 6px 18px rgba(0,0,0,.35),
-                        inset 0 2px 6px rgba(255,255,255,.3);
+                        0 4px 12px rgba(0,0,0,.3),
+                        inset 0 1px 4px rgba(255,255,255,.3);
                     display:flex;
                     justify-content:center;
                     align-items:center;
                     color:white;
                     font-weight:bold;
-                    font-size:19px;
+                    font-size:14px;
                 ">
                     ${sum}
                 </div>`,
                 className:"",
-                iconSize:[52, 52]
+                iconSize:[38, 38]
             });
         }
         """
@@ -173,7 +173,6 @@ with col1:
         for _, row in df.iterrows():
             trash_count = int(row['trash_count'])
 
-            # 쓰레기 개수에 따른 색상 지정
             if trash_count <= 2:
                 color = "#2ECC71"
             elif trash_count <= 5:
@@ -183,30 +182,30 @@ with col1:
             else:
                 color = "#E74C3C"
 
-            # 🌟 개선: 구글맵 스타일의 개별 마커 아이콘 HTML
+            # 🌟 변경: 개별 마커 크기를 38px -> 26px로 대폭 축소 (구글맵 스타일)
             html_icon = f"""
             <div style="
-                width:38px;
-                height:38px;
+                width:26px;
+                height:26px;
                 border-radius:50%;
                 background:{color};
-                border:4px solid white;
+                border:2.5px solid white;
                 box-shadow:
-                    0 4px 12px rgba(0,0,0,.35),
-                    inset 0 2px 4px rgba(255,255,255,.35);
+                    0 3px 8px rgba(0,0,0,.3),
+                    inset 0 1px 3px rgba(255,255,255,.35);
                 display:flex;
                 justify-content:center;
                 align-items:center;
                 color:white;
                 font-weight:700;
-                font-size:16px;
+                font-size:11px;
                 transition:0.2s;
             ">
                 {trash_count}
             </div>
             """
 
-            # 🌟 개선: 깔끔한 팝업 스타일 및 피드백 주신 마커 옵션 적용
+            # 🌟 변경: 축소된 아이콘 크기(26x26) 및 앵커 포인트(13, 13) 반영
             folium.Marker(
                 location=[row["latitude"], row["longitude"]],
                 popup=folium.Popup(
@@ -218,8 +217,8 @@ with col1:
                 ),
                 icon=folium.DivIcon(
                     html=html_icon,
-                    icon_size=(38, 38),
-                    icon_anchor=(19, 19)
+                    icon_size=(26, 26),
+                    icon_anchor=(13, 13)
                 ),
                 title=str(trash_count)
             ).add_to(marker_cluster)
