@@ -26,7 +26,6 @@ def get_decimal_from_dms(dms, ref):
         decimal = -decimal
     return decimal
 
-# 🌟 개선: 함수가 이미지 바이트 대신 PIL 이미지 객체를 직접 받도록 수정
 def extract_gps_info(pil_image):
     try:
         exif = pil_image._getexif()
@@ -49,7 +48,6 @@ def extract_gps_info(pil_image):
         return None, None
     return None, None
 
-# 🌟 개선: 함수가 이미지 바이트 대신 PIL 이미지 객체를 직접 받도록 수정
 def count_trash_in_image(pil_image):
     results = model(pil_image)
     return len(results[0].boxes)
@@ -57,7 +55,6 @@ def count_trash_in_image(pil_image):
 def load_data():
     if os.path.exists(DATA_FILE):
         df = pd.read_csv(DATA_FILE)
-        # 데이터 로드 시 trash_count를 정수형으로 변환
         df['trash_count'] = df['trash_count'].astype(int)
         return df
     return pd.DataFrame(columns=["filename", "latitude", "longitude", "trash_count"])
@@ -92,7 +89,6 @@ if uploaded_files:
             new_records = []
             for file in uploaded_files:
                 try:
-                    # 🌟 개선: 이미지를 한번만 열어서 처리
                     pil_img = Image.open(file)
                     lat, lon = extract_gps_info(pil_img)
                     
@@ -122,37 +118,110 @@ with col1:
         m = folium.Map(location=[df["latitude"].mean(), df["longitude"].mean()], zoom_start=13)
         Fullscreen().add_to(m)
 
-        # 🌟 수정: 자바스크립트에서 marker.options.custom_trash_count 대신 marker.options.title을 읽도록 변경
+        # 🌟 개선: 구글맵 스타일의 커스텀 클러스터 생성 함수
         icon_create_function = """
-        function(cluster) {
+        function(cluster){
             var markers = cluster.getAllChildMarkers();
             var sum = 0;
-            for (var i = 0; i < markers.length; i++) {
+
+            for(var i=0; i<markers.length; i++){
                 sum += parseInt(markers[i].options.title) || 0;
             }
-            var iconHtml = '<div style="background-color: #CB4335; color: white; border-radius: 50%; width: 36px; height: 36px; display: flex; justify-content: center; align-items: center; font-weight: bold; font-size: 13px; border: 2px solid white; box-shadow: 2px 2px 4px rgba(0,0,0,0.5);">' + sum + '</div>';
-            return L.divIcon({ html: iconHtml, className: 'marker-cluster-custom', iconSize: L.point(36, 36) });
+
+            var color;
+            if(sum <= 5)
+                color = "#2ECC71";
+            else if(sum <= 15)
+                color = "#F1C40F";
+            else if(sum <= 30)
+                color = "#E67E22";
+            else
+                color = "#E74C3C";
+
+            return L.divIcon({
+                html:
+                `<div style="
+                    width:52px;
+                    height:52px;
+                    border-radius:50%;
+                    background:${color};
+                    border:5px solid white;
+                    box-shadow:
+                        0 6px 18px rgba(0,0,0,.35),
+                        inset 0 2px 6px rgba(255,255,255,.3);
+                    display:flex;
+                    justify-content:center;
+                    align-items:center;
+                    color:white;
+                    font-weight:bold;
+                    font-size:19px;
+                ">
+                    ${sum}
+                </div>`,
+                className:"",
+                iconSize:[52, 52]
+            });
         }
-         """ 
+        """
 
         marker_cluster = MarkerCluster(
             name="Trash Cluster",
             icon_create_function=icon_create_function,
-            options={'maxClusterRadius': 30} # 반경을 조금 넓혀 클러스터링이 더 잘 되도록 조정
+            options={'maxClusterRadius': 40}
         ).add_to(m)
 
         for _, row in df.iterrows():
             trash_count = int(row['trash_count'])
-            html_icon = f"""
-            <div style="background-color: #E74C3C; ...">{trash_count}</div>
-            """ # (이전 코드와 동일하여 생략)
 
-            # 🌟 수정: 유실되는 options 대신, 안정적인 'title' 속성에 쓰레기 개수(문자열)를 저장
+            # 쓰레기 개수에 따른 색상 지정
+            if trash_count <= 2:
+                color = "#2ECC71"
+            elif trash_count <= 5:
+                color = "#F1C40F"
+            elif trash_count <= 10:
+                color = "#E67E22"
+            else:
+                color = "#E74C3C"
+
+            # 🌟 개선: 구글맵 스타일의 개별 마커 아이콘 HTML
+            html_icon = f"""
+            <div style="
+                width:38px;
+                height:38px;
+                border-radius:50%;
+                background:{color};
+                border:4px solid white;
+                box-shadow:
+                    0 4px 12px rgba(0,0,0,.35),
+                    inset 0 2px 4px rgba(255,255,255,.35);
+                display:flex;
+                justify-content:center;
+                align-items:center;
+                color:white;
+                font-weight:700;
+                font-size:16px;
+                transition:0.2s;
+            ">
+                {trash_count}
+            </div>
+            """
+
+            # 🌟 개선: 깔끔한 팝업 스타일 및 피드백 주신 마커 옵션 적용
             folium.Marker(
-                [row['latitude'], row['longitude']],
-                popup=f"파일명: {row['filename']}<br>쓰레기 개수: {trash_count}개",
-                icon=folium.DivIcon(html=html_icon),
-                title=str(trash_count) # 여기에 개수를 문자열로 저장
+                location=[row["latitude"], row["longitude"]],
+                popup=folium.Popup(
+                    f"""
+                    <b>{row['filename']}</b><br>
+                    🗑️ 쓰레기 <b>{trash_count}개</b>
+                    """,
+                    max_width=250
+                ),
+                icon=folium.DivIcon(
+                    html=html_icon,
+                    icon_size=(38, 38),
+                    icon_anchor=(19, 19)
+                ),
+                title=str(trash_count)
             ).add_to(marker_cluster)
 
         st_folium(m, use_container_width=True, height=550, key="trash_map")
