@@ -143,9 +143,44 @@ with col1:
 
         for _, row in df.iterrows():
             trash_count = int(row['trash_count'])
-            html_icon = f"""
-            <div style="background-color: #E74C3C; ...">{trash_count}</div>
-            """ # (이전 코드와 동일하여 생략)
+            if trash_count <= 2:
+    color = "#2ECC71"
+elif trash_count <= 5:
+    color = "#F1C40F"
+elif trash_count <= 10:
+    color = "#E67E22"
+else:
+    color = "#E74C3C"
+
+html_icon = f"""
+<div style="
+    position:relative;
+    width:34px;
+    height:34px;
+    background:{color};
+    border-radius:50% 50% 50% 0;
+    transform:rotate(-45deg);
+    border:3px solid white;
+    box-shadow:0 4px 12px rgba(0,0,0,.35);
+">
+
+<div style="
+    position:absolute;
+    width:100%;
+    height:100%;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    transform:rotate(45deg);
+    color:white;
+    font-weight:bold;
+    font-size:15px;
+">
+{trash_count}
+</div>
+
+</div>
+"""
 
             # 🌟 수정: 유실되는 options 대신, 안정적인 'title' 속성에 쓰레기 개수(문자열)를 저장
             folium.Marker(
